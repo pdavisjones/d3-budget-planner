@@ -38,7 +38,3 @@ form.addEventListener('submit', (e) => {
         error.textContent = 'Oops! No values were entered.';
     }
 })
-
-// retreive the submitted data
-// if the user didn't enter data, show an error
-// submit the data object as a document to the Firestore database
