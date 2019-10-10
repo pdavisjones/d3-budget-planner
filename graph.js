@@ -53,6 +53,9 @@ const arcPath = d3.arc()
     // used to create a donut chart
     .innerRadius(dims.radius / 2);
 
+// take a domain and convert it into a color range for use in coloring wedges
+const color = d3.scaleOrdinal(d3['schemeSet1']);
+
 /////////////////////////////////////////////////////
 //////// listen to the Firestore database ///////////
 /////////////////////////////////////////////////////
@@ -60,7 +63,33 @@ var data = [];
 
 // function that fires when Firestore sends us a new data snapshot
 const update = (data) => {
-    console.log(data);
+
+    // update the color scale domain by creating a new array (using the map method) comprised of the name propoerty in each object
+    color.domain(data.map(d => d.name));
+
+    // pass the Firestore data into the pie() and join to path elements
+    const paths = graph.selectAll('path')
+        // Select the group's paths, use the data() method to join our @data param array after passing it through pie(). This creates virtual elements ready to be entered (enter selection) to the DOM.
+        .data(pie(data));
+    
+    // append a path to each virtual enter selection by appending characteristics to the d attribute by referencing the arcPath method
+    paths.enter()
+        .append('path')
+        .attr('class', 'arc')
+        // automatically pass data object into the arcPath method
+        .attr('d', arcPath)
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 3)
+        // because we pass our data to pie(), the name property is inside the data property returned by pie()
+        .attr('fill', d => color(d.data.name));    
+    
+    //get any in the exit selection and remove
+    paths.exit().remove();
+
+    // handle current DOM path updates
+        // grab the current selection "paths" and its "d" attribute (this draws the SVG), and call the arcPath function to reset it
+        paths.attr('d', arcPath);
+
 }
 
 // onSnapshot() listens to the collection and does something with each response
