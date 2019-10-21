@@ -61,11 +61,24 @@ const color = d3.scaleOrdinal(d3['schemeSet1']);
 /////////////////////////////////////////////////////
 var data = [];
 
+// set up the legend
+const legendGroup = svg.append('g')
+    .attr('transform', `translate(${dims.width + 40}, 10)`)
+const legend = d3.legendColor()
+    // set the shape that will be to the left of each legend item
+    .shape('circle')
+    .shapePadding(10)
+    .scale(color);
+
 // function that fires when Firestore sends us a new data snapshot
 const update = (data) => {
 
     // update the color scale domain by creating a new array (using the map method) comprised of the name propoerty in each object
     color.domain(data.map(d => d.name));
+
+    // update and call the legend
+    legendGroup.call(legend);
+    legendGroup.selectAll('text').attr('fill', 'white')
 
     // pass the Firestore data into the pie() and join to path elements
     const paths = graph.selectAll('path')
@@ -76,19 +89,28 @@ const update = (data) => {
     paths.enter()
         .append('path')
         .attr('class', 'arc')
-        // automatically pass data object into the arcPath method
-        .attr('d', arcPath)
+        // automatically pass data object into the arcPath method (commented out b/c using a transition + tween to build it now)
+        // .attr('d', arcPath)
         .attr('stroke', '#fff')
         .attr('stroke-width', 3)
         // because we pass our data to pie(), the name property is inside the data property returned by pie()
-        .attr('fill', d => color(d.data.name));    
+        .attr('fill', d => color(d.data.name))
+        .each(function(d) { this._current = d })
+        // call the tween to animate arcs
+        .transition().duration(750)
+            .attrTween('d', arcTweenEnter);
     
     //get any in the exit selection and remove
-    paths.exit().remove();
+    paths.exit()
+        .transition().duration(750)
+            .attrTween('d', arcTweenExit)
+        .remove();
 
     // handle current DOM path updates
         // grab the current selection "paths" and its "d" attribute (this draws the SVG), and call the arcPath function to reset it
-        paths.attr('d', arcPath);
+    paths.attr('d', arcPath)
+        .transition().duration(750)
+        .attrTween('d', arcTweenUpdate);
 
 }
 
@@ -124,4 +146,36 @@ db.collection('expenses').onSnapshot(res => {
     update(data);
 
 })
-    
+
+// tween to interpolate angles, use them to re-draw (animate) path for *enter* selection
+const arcTweenEnter = (d) => {
+    var i = d3.interpolate(d.endAngle, d.startAngle);
+
+    return function (t) {
+        d.startAngle = i(t);
+        return arcPath(d);
+    }
+};
+
+// tween to interpolate angles, use them to re-draw (animate) path for *exit* selection
+const arcTweenExit = (d) => {
+    var i = d3.interpolate(d.startAngle, d.endAngle);
+
+    return function (t) {
+        d.startAngle = i(t);
+        return arcPath(d);
+    }
+};
+
+/* tween to interpolate angles for wedges being modified but not in the enter or exit selection */
+// use function keyword instead of arrow function so we can use this keyword to reference current element
+function arcTweenUpdate(d) {
+    // interpolate between the two objects
+    var i = d3.interpolate(this._current, d);
+    // update the _current prop with the new data
+    this._current = i(1);
+
+    return function (t) {
+        return arcPath(i(t));
+    }
+};
