@@ -70,6 +70,21 @@ const legend = d3.legendColor()
     .shapePadding(10)
     .scale(color);
 
+// creates a tip w/ the Tooltop d3 script
+const tip = d3.tip()
+    //              ^-- makes the tip library chainable on d3, and adds a tip 
+    .attr('class', 'tip card')
+    //                 ^-- adds materialize styling
+    .html(d => {
+        let content = `<div class="name">${d.data.name}</div>`;
+        content += `<div class="cost">$${d.data.cost}</div>`;
+        content += `<div class="delete">Click slice to delete</div>`
+        return content;
+    });
+    // ^-- what's inside the tooltip when shown (takes @d)
+
+graph.call(tip);
+
 // function that fires when Firestore sends us a new data snapshot
 const update = (data) => {
 
@@ -100,6 +115,22 @@ const update = (data) => {
         .transition().duration(750)
             .attrTween('d', arcTweenEnter);
     
+        // attach listeners to graph elements -- callbacks handled at higher scope
+    graph.selectAll('path')
+        .on('mouseover', (d, i, n) => {
+            tip.show(d, n[i]);
+        //    ^-- method from tip library
+            handleMouseOver(d, i, n);
+        })
+// listen event -^  callback ---^
+        .on('mouseout', (d, i, n) => {
+            // hide the tooltip when we move out of the slice
+            tip.hide();
+            handleMouseOut(d, i, n);
+        })
+        .on('click', handleClick)
+
+
     //get any in the exit selection and remove
     paths.exit()
         .transition().duration(750)
@@ -179,3 +210,26 @@ function arcTweenUpdate(d) {
         return arcPath(i(t));
     }
 };
+
+// event handlers
+const handleMouseOver = (d, i, n) => {
+    // data + index + array
+    
+    //console.log(n[i]);
+    //        ^--- returns this element
+
+    d3.select(n[i])
+        .transition('changeSliceFill').duration(300)
+            .attr('fill', '#fff');
+}
+
+const handleMouseOut = (d, i, n) => {
+    d3.select(n[i])
+        .transition('changeSliceFill').duration(300)
+            .attr('fill', color(d.data.name));
+}
+
+const handleClick = (d) => {
+    const id = d.data.id;
+    db.collection('expenses').doc(id).delete();
+}
